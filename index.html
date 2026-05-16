@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#e85d4e" />
+<title>Pomo Focus - ポモドーロ & タスク管理</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🍅%3C/text%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #f5f3ef;
+    --surface: #ffffff;
+    --text: #2b2b2b;
+    --muted: #777;
+    --border: #e3ddd2;
+    --accent: #e85d4e;
+    --accent-soft: #fde7e4;
+    --short: #4ea1e8;
+    --long:  #6cae6c;
+    --shadow: 0 2px 10px rgba(0,0,0,.06);
+  }
+  [data-theme="dark"] {
+    --bg: #1a1a1d;
+    --surface: #25252a;
+    --text: #ececec;
+    --muted: #9a9a9a;
+    --border: #36363c;
+    --accent: #ff7367;
+    --accent-soft: #3a2725;
+    --short: #6bb5ff;
+    --long:  #82c882;
+    --shadow: 0 2px 10px rgba(0,0,0,.4);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    transition: background .25s, color .25s;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { font-size: 18px; margin: 0; }
+  .icon-btn {
+    background: none; border: none; cursor: pointer;
+    font-size: 18px; color: var(--text); padding: 6px 10px;
+    border-radius: 8px;
+  }
+  .icon-btn:hover { background: var(--accent-soft); }
+  main {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 18px;
+  }
+  .modes {
+    display: flex; gap: 6px; margin-bottom: 18px;
+    background: var(--surface); padding: 6px; border-radius: 12px;
+    box-shadow: var(--shadow);
+  }
+  .modes button {
+    flex: 1; border: none; background: transparent;
+    color: var(--muted); font-size: 13px; font-weight: 600;
+    padding: 9px 4px; border-radius: 8px; cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .modes button.active { background: var(--accent); color: #fff; }
+  .modes button[data-mode="short"].active { background: var(--short); }
+  .modes button[data-mode="long"].active { background: var(--long); }
+
+  .timer-card {
+    background: var(--surface);
+    padding: 36px 20px;
+    border-radius: 16px;
+    text-align: center;
+    box-shadow: var(--shadow);
+    margin-bottom: 18px;
+  }
+  .time-display {
+    font-size: 84px;
+    font-weight: 200;
+    letter-spacing: -2px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 6px;
+  }
+  .current-task {
+    color: var(--muted);
+    font-size: 14px;
+    min-height: 20px;
+    margin-bottom: 22px;
+  }
+  .controls { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    border: none; cursor: pointer;
+    padding: 11px 26px; border-radius: 10px;
+    font-size: 15px; font-weight: 600;
+    transition: transform .08s, opacity .15s;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn-primary { background: var(--accent); color: #fff; min-width: 130px; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+
+  .stats {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    margin-bottom: 22px;
+  }
+  .stat {
+    background: var(--surface); border-radius: 12px; padding: 12px;
+    text-align: center; box-shadow: var(--shadow);
+  }
+  .stat-num { font-size: 22px; font-weight: 700; }
+  .stat-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .section-title {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 4px 0 10px;
+  }
+  .section-title h2 { font-size: 14px; margin: 0; color: var(--muted); font-weight: 600; letter-spacing: .5px; text-transform: uppercase; }
+
+  .task-input {
+    display: flex; gap: 8px; margin-bottom: 12px;
+  }
+  .task-input input {
+    flex: 1; padding: 11px 14px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    font-size: 14px; outline: none;
+  }
+  .task-input input:focus { border-color: var(--accent); }
+  .task-input button {
+    background: var(--accent); color: #fff; border: none; border-radius: 10px;
+    padding: 0 16px; font-weight: 600; cursor: pointer; font-size: 18px;
+  }
+
+  .task-list { list-style: none; padding: 0; margin: 0; }
+  .task-item {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); padding: 12px 14px;
+    border-radius: 10px; margin-bottom: 8px;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color .15s;
+  }
+  .task-item.selected { border-color: var(--accent); }
+  .task-item.done .task-text { text-decoration: line-through; color: var(--muted); }
+  .task-checkbox {
+    width: 20px; height: 20px; border-radius: 50%;
+    border: 2px solid var(--border); cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface);
+  }
+  .task-item.done .task-checkbox { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .task-text { flex: 1; font-size: 14px; }
+  .task-meta { font-size: 11px; color: var(--muted); }
+  .task-delete {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    padding: 4px 6px; font-size: 16px; opacity: 0;
+    transition: opacity .15s;
+  }
+  .task-item:hover .task-delete { opacity: 1; }
+  .empty { text-align: center; color: var(--muted); padding: 20px; font-size: 13px; }
+
+  .footer-actions {
+    display: flex; gap: 8px; justify-content: center; margin-top: 22px;
+    font-size: 12px;
+  }
+  .footer-actions button {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    text-decoration: underline; font-size: 12px;
+  }
+
+  /* Settings modal */
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(0,0,0,.5);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100; padding: 20px;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: var(--surface); border-radius: 14px; padding: 22px;
+    width: 100%; max-width: 360px;
+  }
+  .modal h3 { margin: 0 0 14px; font-size: 16px; }
+  .settings-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .settings-row label { font-size: 14px; }
+  .settings-row input[type="number"] {
+    width: 70px; padding: 6px 8px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text);
+    text-align: right; font-size: 14px;
+  }
+  .modal-close {
+    width: 100%; padding: 10px; margin-top: 6px;
+    background: var(--accent); color: #fff;
+    border: none; border-radius: 10px; font-weight: 600; cursor: pointer;
+  }
+
+  @media (max-width: 480px) {
+    .time-display { font-size: 64px; }
+    main { padding: 14px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🍅 Pomo Focus</h1>
+  <div>
+    <button class="icon-btn" id="themeBtn" title="テーマ切替">🌓</button>
+    <button class="icon-btn" id="settingsBtn" title="設定">⚙️</button>
+  </div>
+</header>
+
+<main>
+  <div class="modes">
+    <button data-mode="work" class="active">集中</button>
+    <button data-mode="short">短い休憩</button>
+    <button data-mode="long">長い休憩</button>
+  </div>
+
+  <div class="timer-card">
+    <div class="time-display" id="timeDisplay">25:00</div>
+    <div class="current-task" id="currentTaskLabel">タスクを選んでください</div>
+    <div class="controls">
+      <button class="btn btn-primary" id="startBtn">スタート</button>
+      <button class="btn btn-ghost" id="resetBtn">リセット</button>
+      <button class="btn btn-ghost" id="skipBtn">スキップ</button>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-num" id="statToday">0</div><div class="stat-label">今日</div></div>
+    <div class="stat"><div class="stat-num" id="statWeek">0</div><div class="stat-label">今週</div></div>
+    <div class="stat"><div class="stat-num" id="statTotal">0</div><div class="stat-label">累計</div></div>
+  </div>
+
+  <div class="section-title">
+    <h2>タスク</h2>
+  </div>
+  <div class="task-input">
+    <input type="text" id="taskInput" placeholder="新しいタスクを追加..." maxlength="100" />
+    <button id="addTaskBtn">+</button>
+  </div>
+  <ul class="task-list" id="taskList"></ul>
+  <div class="empty" id="emptyMsg" style="display:none;">タスクを追加すると、ポモドーロと連携できます</div>
+
+  <div class="footer-actions">
+    <button id="exportBtn">データをエクスポート</button>
+    <button id="importBtn">インポート</button>
+    <button id="clearBtn">全データを削除</button>
+  </div>
+  <input type="file" id="importFile" accept=".json" style="display:none" />
+</main>
+
+<div class="modal-bg" id="settingsModal">
+  <div class="modal">
+    <h3>⚙️ 設定</h3>
+    <div class="settings-row">
+      <label>集中時間 (分)</label>
+      <input type="number" id="workMin" min="1" max="120" />
+    </div>
+    <div class="settings-row">
+      <label>短い休憩 (分)</label>
+      <input type="number" id="shortMin" min="1" max="60" />
+    </div>
+    <div class="settings-row">
+      <label>長い休憩 (分)</label>
+      <input type="number" id="longMin" min="1" max="120" />
+    </div>
+    <div class="settings-row">
+      <label>長休憩までの回数</label>
+      <input type="number" id="longInterval" min="2" max="10" />
+    </div>
+    <div class="settings-row">
+      <label>音通知</label>
+      <input type="checkbox" id="soundOn" />
+    </div>
+    <div class="settings-row">
+      <label>ブラウザ通知</label>
+      <input type="checkbox" id="notifyOn" />
+    </div>
+    <button class="modal-close" id="closeSettings">閉じる</button>
+  </div>
+</div>
+
+<script>
+// ===== State =====
+const DEFAULT_SETTINGS = {
+  work: 25, short: 5, long: 15, longInterval: 4,
+  sound: true, notify: false, theme: 'light'
+};
+let state = {
+  mode: 'work',
+  running: false,
+  remaining: 25 * 60,
+  endTime: null,
+  tasks: [],
+  selectedTaskId: null,
+  completedToday: 0,
+  todayDate: todayKey(),
+  history: [],         // { date: 'YYYY-MM-DD', count: N }
+  totalSessions: 0,
+  workCountInCycle: 0, // for deciding long break
+  settings: { ...DEFAULT_SETTINGS },
+};
+let tickInterval = null;
+const STORAGE_KEY = 'pomofocus_v1';
+
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// ===== Persistence =====
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    tasks: state.tasks,
+    selectedTaskId: state.selectedTaskId,
+    completedToday: state.completedToday,
+    todayDate: state.todayDate,
+    history: state.history,
+    totalSessions: state.totalSessions,
+    workCountInCycle: state.workCountInCycle,
+    settings: state.settings,
+  }));
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    Object.assign(state, data);
+    state.settings = { ...DEFAULT_SETTINGS, ...(data.settings || {}) };
+    // Reset today's count if date changed
+    if (state.todayDate !== todayKey()) {
+      if (state.completedToday > 0) {
+        state.history.push({ date: state.todayDate, count: state.completedToday });
+        // keep last 90 days
+        state.history = state.history.slice(-90);
+      }
+      state.completedToday = 0;
+      state.todayDate = todayKey();
+      state.workCountInCycle = 0;
+    }
+  } catch(e) { console.error(e); }
+}
+
+// ===== Timer =====
+function modeDurationSec(mode) {
+  return state.settings[mode] * 60;
+}
+function setMode(mode) {
+  if (state.running) {
+    if (!confirm('タイマーを止めてモードを切り替えますか?')) return;
+    stopTimer();
+  }
+  state.mode = mode;
+  state.remaining = modeDurationSec(mode);
+  render();
+}
+function startTimer() {
+  if (state.running) return;
+  state.running = true;
+  state.endTime = Date.now() + state.remaining * 1000;
+  tickInterval = setInterval(tick, 250);
+  render();
+}
+function stopTimer() {
+  state.running = false;
+  state.endTime = null;
+  clearInterval(tickInterval);
+  render();
+}
+function resetTimer() {
+  stopTimer();
+  state.remaining = modeDurationSec(state.mode);
+  render();
+}
+function skipTimer() {
+  stopTimer();
+  finishSession(true);
+}
+function tick() {
+  if (!state.running) return;
+  const left = Math.max(0, Math.round((state.endTime - Date.now()) / 1000));
+  state.remaining = left;
+  if (left <= 0) {
+    stopTimer();
+    finishSession(false);
+  }
+  renderTime();
+}
+function finishSession(skipped) {
+  if (!skipped) {
+    playSound();
+    notify();
+  }
+  if (state.mode === 'work') {
+    if (!skipped) {
+      state.completedToday++;
+      state.totalSessions++;
+      state.workCountInCycle++;
+      // increment selected task counter
+      if (state.selectedTaskId) {
+        const t = state.tasks.find(x => x.id === state.selectedTaskId);
+        if (t) t.pomos = (t.pomos || 0) + 1;
+      }
+    }
+    // decide next break
+    const nextMode = state.workCountInCycle >= state.settings.longInterval ? 'long' : 'short';
+    if (nextMode === 'long') state.workCountInCycle = 0;
+    state.mode = nextMode;
+  } else {
+    state.mode = 'work';
+  }
+  state.remaining = modeDurationSec(state.mode);
+  save();
+  render();
+}
+
+// ===== Sound & Notification =====
+let audioCtx = null;
+function playSound() {
+  if (!state.settings.sound) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    [880, 1320, 880].forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0, audioCtx.currentTime + i * 0.25);
+      gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + i * 0.25 + 0.02);
+      gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + i * 0.25 + 0.22);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(audioCtx.currentTime + i * 0.25);
+      osc.stop(audioCtx.currentTime + i * 0.25 + 0.22);
+    });
+  } catch(e) { /* ignore */ }
+}
+function notify() {
+  if (!state.settings.notify) return;
+  if (Notification.permission !== 'granted') return;
+  const msg = state.mode === 'work'
+    ? '集中時間が終わりました!ひと休みしましょう ☕'
+    : '休憩終了!次の集中タイムです 🔥';
+  try { new Notification('Pomo Focus', { body: msg, icon: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🍅%3C/text%3E%3C/svg%3E' }); } catch(e) {}
+}
+
+// ===== Tasks =====
+function addTask(text) {
+  text = text.trim();
+  if (!text) return;
+  state.tasks.unshift({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    text, done: false, pomos: 0, created: Date.now()
+  });
+  save();
+  renderTasks();
+}
+function toggleTask(id) {
+  const t = state.tasks.find(x => x.id === id);
+  if (t) { t.done = !t.done; save(); renderTasks(); }
+}
+function deleteTask(id) {
+  state.tasks = state.tasks.filter(x => x.id !== id);
+  if (state.selectedTaskId === id) state.selectedTaskId = null;
+  save();
+  renderTasks();
+  renderCurrentTask();
+}
+function selectTask(id) {
+  state.selectedTaskId = state.selectedTaskId === id ? null : id;
+  save();
+  renderTasks();
+  renderCurrentTask();
+}
+
+// ===== Rendering =====
+function fmtTime(sec) {
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function renderTime() {
+  document.getElementById('timeDisplay').textContent = fmtTime(state.remaining);
+  const labels = { work: '集中', short: '短い休憩', long: '長い休憩' };
+  document.title = `${fmtTime(state.remaining)} - ${labels[state.mode]} | Pomo Focus`;
+}
+function renderModes() {
+  document.querySelectorAll('.modes button').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === state.mode);
+  });
+  // accent color shift via body data-attr
+  document.documentElement.style.setProperty('--current-accent',
+    state.mode === 'work' ? 'var(--accent)' :
+    state.mode === 'short' ? 'var(--short)' : 'var(--long)');
+}
+function renderControls() {
+  document.getElementById('startBtn').textContent = state.running ? '一時停止' : 'スタート';
+}
+function renderStats() {
+  document.getElementById('statToday').textContent = state.completedToday;
+  const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - 6);
+  const weekStartKey = `${weekStart.getFullYear()}-${String(weekStart.getMonth()+1).padStart(2,'0')}-${String(weekStart.getDate()).padStart(2,'0')}`;
+  const weekCount = state.history
+    .filter(h => h.date >= weekStartKey)
+    .reduce((a,b) => a + b.count, 0) + state.completedToday;
+  document.getElementById('statWeek').textContent = weekCount;
+  document.getElementById('statTotal').textContent = state.totalSessions;
+}
+function renderTasks() {
+  const ul = document.getElementById('taskList');
+  const empty = document.getElementById('emptyMsg');
+  ul.innerHTML = '';
+  if (state.tasks.length === 0) {
+    empty.style.display = 'block'; return;
+  }
+  empty.style.display = 'none';
+  state.tasks.forEach(t => {
+    const li = document.createElement('li');
+    li.className = 'task-item' + (t.done ? ' done' : '') + (state.selectedTaskId === t.id ? ' selected' : '');
+    li.innerHTML = `
+      <div class="task-checkbox">${t.done ? '✓' : ''}</div>
+      <div class="task-text">${escapeHtml(t.text)}${t.pomos ? `<div class="task-meta">🍅 ${t.pomos}</div>` : ''}</div>
+      <button class="task-delete" title="削除">🗑</button>
+    `;
+    li.querySelector('.task-checkbox').onclick = (e) => { e.stopPropagation(); toggleTask(t.id); };
+    li.querySelector('.task-delete').onclick = (e) => { e.stopPropagation(); if(confirm('このタスクを削除しますか?')) deleteTask(t.id); };
+    li.onclick = () => selectTask(t.id);
+    ul.appendChild(li);
+  });
+}
+function renderCurrentTask() {
+  const el = document.getElementById('currentTaskLabel');
+  if (!state.selectedTaskId) { el.textContent = 'タスクを選んでください'; return; }
+  const t = state.tasks.find(x => x.id === state.selectedTaskId);
+  el.textContent = t ? `🎯 ${t.text}` : '';
+}
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function render() {
+  renderTime();
+  renderModes();
+  renderControls();
+  renderStats();
+  renderTasks();
+  renderCurrentTask();
+}
+
+// ===== Theme =====
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  state.settings.theme = theme;
+}
+function toggleTheme() {
+  applyTheme(state.settings.theme === 'dark' ? 'light' : 'dark');
+  save();
+}
+
+// ===== Settings =====
+function openSettings() {
+  document.getElementById('workMin').value = state.settings.work;
+  document.getElementById('shortMin').value = state.settings.short;
+  document.getElementById('longMin').value = state.settings.long;
+  document.getElementById('longInterval').value = state.settings.longInterval;
+  document.getElementById('soundOn').checked = state.settings.sound;
+  document.getElementById('notifyOn').checked = state.settings.notify;
+  document.getElementById('settingsModal').classList.add('open');
+}
+function closeSettings() {
+  const newSettings = {
+    work: Math.max(1, parseInt(document.getElementById('workMin').value) || 25),
+    short: Math.max(1, parseInt(document.getElementById('shortMin').value) || 5),
+    long: Math.max(1, parseInt(document.getElementById('longMin').value) || 15),
+    longInterval: Math.max(2, parseInt(document.getElementById('longInterval').value) || 4),
+    sound: document.getElementById('soundOn').checked,
+    notify: document.getElementById('notifyOn').checked,
+  };
+  Object.assign(state.settings, newSettings);
+  if (state.settings.notify && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+  if (!state.running) state.remaining = modeDurationSec(state.mode);
+  save();
+  render();
+  document.getElementById('settingsModal').classList.remove('open');
+}
+
+// ===== Import/Export =====
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `pomofocus-backup-${todayKey()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function importData(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!confirm('現在のデータを上書きします。続行しますか?')) return;
+      Object.assign(state, data);
+      state.settings = { ...DEFAULT_SETTINGS, ...(data.settings || {}) };
+      stopTimer();
+      state.remaining = modeDurationSec(state.mode);
+      applyTheme(state.settings.theme);
+      save();
+      render();
+      alert('インポート完了!');
+    } catch (err) {
+      alert('ファイルの読み込みに失敗しました');
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ===== Init =====
+function init() {
+  load();
+  applyTheme(state.settings.theme);
+  state.remaining = state.running ? state.remaining : modeDurationSec(state.mode);
+  state.running = false;
+
+  // Bind
+  document.querySelectorAll('.modes button').forEach(b => {
+    b.onclick = () => setMode(b.dataset.mode);
+  });
+  document.getElementById('startBtn').onclick = () => state.running ? stopTimer() : startTimer();
+  document.getElementById('resetBtn').onclick = resetTimer;
+  document.getElementById('skipBtn').onclick = () => { if(confirm('このセッションをスキップしますか?')) skipTimer(); };
+  document.getElementById('themeBtn').onclick = toggleTheme;
+  document.getElementById('settingsBtn').onclick = openSettings;
+  document.getElementById('closeSettings').onclick = closeSettings;
+
+  document.getElementById('addTaskBtn').onclick = () => {
+    const input = document.getElementById('taskInput');
+    addTask(input.value);
+    input.value = '';
+  };
+  document.getElementById('taskInput').onkeydown = (e) => {
+    if (e.key === 'Enter') document.getElementById('addTaskBtn').click();
+  };
+
+  document.getElementById('exportBtn').onclick = exportData;
+  document.getElementById('importBtn').onclick = () => document.getElementById('importFile').click();
+  document.getElementById('importFile').onchange = (e) => {
+    if (e.target.files[0]) importData(e.target.files[0]);
+    e.target.value = '';
+  };
+  document.getElementById('clearBtn').onclick = () => {
+    if (confirm('本当に全データを削除しますか?この操作は取り消せません。')) {
+      localStorage.removeItem(STORAGE_KEY);
+      location.reload();
+    }
+  };
+
+  // Keyboard shortcut: Space to start/pause
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.code === 'Space') {
+      e.preventDefault();
+      state.running ? stopTimer() : startTimer();
+    }
+  });
+
+  render();
+
+  // Service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
+}
+init();
+</script>
+</body>
+</html>
